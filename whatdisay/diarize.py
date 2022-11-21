@@ -84,7 +84,7 @@ class Diarize():
 
         ## Free up some memory cuz we've been at if for a while
         print('Freeing up some memory because we\'ve been at it a while!')
-        del sounds, spacer, audio, dz
+        del sounds, spacer, audio, dz, diarization
 
         return segments, dzList
 
@@ -103,7 +103,7 @@ class Diarize():
         cd = self.pipelines_cash_dir
         load_dotenv()
         huggingface_token = os.environ.get('HUGGINGFACE_TOKEN')
-                
+
         try:
             pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization',use_auth_token=huggingface_token,cache_dir=cd)
         except OSError:

@@ -23,7 +23,7 @@ setup(
     entry_points = {
         'console_scripts': ['whatdisay=whatdisay.transcript:cli'],
     },
-    description="generate diarized transcripts from audio to markdown.",
+    description="Generate diarized transcripts from audio to markdown.",
     long_description=long_description,
     keywords=['obsidian', 'openai', 'whisper','transcription'],
 )

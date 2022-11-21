@@ -5,9 +5,6 @@ import shutil
 from pydub import AudioSegment
 
 
-# def cli():
-#     TODO
-
 def millisec(timeStr):
   spl = timeStr.split(":")
   s = (int)((int(spl[0]) * 60 * 60 + int(spl[1]) * 60 + float(spl[2]) )* 1000)
@@ -51,8 +48,17 @@ class BinPaths:
             print('Directory for final transcription files not detected.  creating one..')
             os.makedirs(self.transcriptions_dir)
 
-    def cleanup(self):
+    def cleanupTask(self):
         # remove the tmp_files
+        p = self.task_dir
+        if os.path.exists(p):
+            print('Deleting task tmp file directory at: {}'.format(p))
+            shutil.rmtree(self.task_dir)
+        else:
+            print('No task tmp directory found for task: {}'.format(self.task_name))
+
+    def cleanupAllTasks(self):
+        # remove all tasks by deleting entire tmp directory
         p = self.tmp_file_dir
         if os.path.exists(p):
             print('Deleting tmp file directory at: {}'.format(p))

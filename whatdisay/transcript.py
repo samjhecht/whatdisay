@@ -101,16 +101,13 @@ def generateDiarizedTranscript(wavFile, binpaths: BinPaths, model="medium"):
 
                 text_file.write(formatted_entry)
 
-    binpaths.cleanup()
-
-
 def cli():
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-fe', '--from-existing', type=str, required=True, help="Generated diarized transcriptiion from an existing recording.")
-    parser.add_argument('-r','--new-recording')
+    parser.add_argument('-r','--new-recording', action="store_true", help="Will kick off a new recording.")
     parser.add_argument('-reset','--reset-pipeline', help="Re-pull pyannote's speaker diarization pipeline.")
-    parser.add_argument('-l','--logging')
+    parser.add_argument('--debug', action="store_true", help="Enable debug mode.")
     args = parser.parse_args()
 
     ts_task = str(int(time.time() * 1000))
@@ -147,8 +144,13 @@ def cli():
             tags = input("Input comma-separated list of tags to add to markdown for Obsidian: ")
 
             generateDiarizedTranscript(wav_file,bin_paths)
-
+            
             # Todo add something to parse input tags and then append them in a format obsidian will like.
+
+            # Now that the job is done, delete the tmp files unless debug mode is on, in which case we'll save them for troubleshoting.
+            if not args.l:
+                bin_paths.cleanupTask()
+
 
 if __name__ == '__main__':
     cli()
