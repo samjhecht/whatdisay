@@ -24,16 +24,15 @@ def addIntroSpacer(input_audio,output_dir):
     audio.export(filename_spacer, format='wav')
     print('Saved new copy of {} at {}'.format(input_audio,filename_spacer))
 
-
-
 class BinPaths:
 
     def __init__(self, event_name, task_ts):
         self.task_name = event_name + '_' + task_ts
         self.event_name = event_name
         self.bin_dir = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__name__))) + '/bin/'
-        self.task_dir = self.bin_dir + str(self.task_name) + '/'
         self.tmp_file_dir = self.task_dir + 'tmp_files/' 
+        self.task_dir = self.tmp_file_dir + str(self.task_name) + '/'
+        self.transcriptions_dir = self.bin_dir = 'diarized_transcriptions/'
         self.pipelines_dir = self.bin_dir + 'pipelines/'
         self.sd_pipeline = self.pipelines_dir + 'models--pyannote--speaker-diarization'
         self.new_recordings_dir = self.bin_dir + 'new_recordings/'
@@ -42,12 +41,15 @@ class BinPaths:
         if not os.path.exists(self.bin_dir):
             print('bin directory not detected.  creating one..')
             os.makedirs(self.bin_dir)
-        if not os.path.exists(self.task_dir):
-            print('Task directory not detected.  creating one..')
-            os.makedirs(self.task_dir)
         if not os.path.exists(self.tmp_file_dir):
             print('Tmp file directory not detected.  creating one..')
             os.makedirs(self.tmp_file_dir)
+        if not os.path.exists(self.task_dir):
+            print('Task directory not detected.  creating one..')
+            os.makedirs(self.task_dir)
+        if not os.path.exists(self.transcriptions_dir):
+            print('Directory for final transcription files not detected.  creating one..')
+            os.makedirs(self.transcriptions_dir)
 
     def cleanup(self):
         # remove the tmp_files

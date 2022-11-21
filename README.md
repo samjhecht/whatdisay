@@ -9,3 +9,4 @@ TODOs:
 - add setup utility that allows u to save ur huggingface token to .env.
 - finish building the record utility
 - make the transcription and diarization faster for longer files
+- add tool that assists in labeling which 'SPEAKER_' maps to human names

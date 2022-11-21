@@ -33,18 +33,17 @@ def generateWhisperTranscript(wavFile, binpaths: BinPaths, model="medium"):
     model = whisper.load_model("medium")
     result = model.transcribe(wavFile)
 
-    output_dir = binpaths.tmp_file_dir
     task_name = binpaths.task_name
     
     # save TXT
-    with open(os.path.join(output_dir, task_name + ".txt"), "w", encoding="utf-8") as txt:
+    with open(os.path.join(binpaths.task_dir, task_name + "_whisper.txt"), "w", encoding="utf-8") as txt:
         whisper.write_txt(result["segments"], file=txt)
-    print('Saved TXT file of whisper transcription at: {}'.format(os.path.join(output_dir, task_name + ".txt")))
+    print('Saved TXT file of whisper transcription at: {}'.format(os.path.join(binpaths.task_dir, task_name + "_whisper.txt")))
     
     # save VTT
-    with open(os.path.join(output_dir, task_name + ".vtt"), "w", encoding="utf-8") as vtt:
+    with open(os.path.join(binpaths.task_dir, task_name + "_whisper.vtt"), "w", encoding="utf-8") as vtt:
         whisper.write_vtt(result["segments"], file=vtt)
-    print('Saved VTT file of whisper transcription at: {}'.format(os.path.join(output_dir, task_name + ".vtt")))
+    print('Saved VTT file of whisper transcription at: {}'.format(os.path.join(binpaths.task_dir, task_name + "_whisper.vtt")))
 
 
 def generateDiarizedTranscript(wavFile, binpaths: BinPaths, model="medium"):
@@ -70,15 +69,14 @@ def generateDiarizedTranscript(wavFile, binpaths: BinPaths, model="medium"):
     dz_wav = os.path.join(binpaths.tmp_file_dir,'dz.wav')
     generateWhisperTranscript(dz_wav, binpaths)
 
-    task_dir = binpaths.task_dir
-    task_name = binpaths.task_name
-    vtt_file = os.path.join(binpaths.tmp_file_dir,task_name + ".vtt")
+    final_output_file = os.path.join(binpaths.transcriptions_dir, binpaths.event_name + ".txt")
+    vtt_file = os.path.join(binpaths.task_dir,binpaths.task_name + "_whisper.vtt")
 
     # Use webvtt-py to read the transcription file generated using whisper
     captions = [[(int)(millisec(caption.start)), (int)(millisec(caption.end)),  caption.text] for caption in webvtt.read(vtt_file)]
     # print(*captions[:8], sep='\n')
 
-    with open(os.path.join(task_dir, binpaths.event_name + ".txt"), "w", encoding="utf-8") as text_file:
+    with open(final_output_file, "w", encoding="utf-8") as text_file:
         
         for i in range(len(segments)):
             idx = 0
