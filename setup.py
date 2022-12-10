@@ -4,7 +4,7 @@ import pkg_resources
 
 from setuptools import find_packages, setup
 
-with open("README.rst") as fh:
+with open("README.md") as fh:
     long_description = fh.read()
 
 setup(
@@ -13,7 +13,7 @@ setup(
     author="Sam Hecht",
     author_email="samjulius@gmail.com",
     url="https://github.com/samjhecht/whatdisay",
-    packages=find_packages('whatdisay'),
+    packages=find_packages(),
     install_requires=[
         str(r)
         for r in pkg_resources.parse_requirements(

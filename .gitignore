@@ -6,7 +6,7 @@ __pycache__/
 # C extensions
 *.so
 
-bin/pipelines/
+output/pipelines/
 
 # Distribution / packaging
 .Python

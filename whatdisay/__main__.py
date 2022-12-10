@@ -1,3 +1,4 @@
-from .transcript import cli
+from cli import cli
 
 cli()
+

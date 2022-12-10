@@ -1,15 +1,13 @@
 import pyaudio
 import wave
-import sys
-import os
-import re
 from pydub import AudioSegment
 
-from .utils import TaskProps, millisec
-from .diarize import Diarize
-import os
+from whatdisay.utils import TaskProps, millisec
 
 
+
+def convertAudio(audio_file):
+    return str('Make this function work.')
 
 def recordAudio(wf):
     CHUNK = 1024
@@ -52,12 +50,12 @@ def recordAudio(wf):
     # print('Recording saved at: {}'.format(WAVE_OUTPUT_FILENAME))
 
 
-def truncateAudio(t1,t2,audio_file):
+def truncateAudio(t1,t2,audio_file, file_names: TaskProps):
 
     newAudio = AudioSegment.from_wav(audio_file)
     a = newAudio[t1:t2]
-    trunc_filename = str(os.path.splitext(audio_file)) + '_trunc'
+    trunc_filename = file_names.task_dir + file_names.event_name + '_trunc.wav'
     a.export(trunc_filename, format="wav") 
-    
-    return trunc_filename + '.wav'
+
+    print('Saved truncated version of audio file at location: {}'.format(trunc_filename))
 
