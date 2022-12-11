@@ -1,96 +1,103 @@
 #!/usr/bin/env python3
 
-from utils import TaskProps, millisec
-from diarize import Diarize
-import transcribe
-from audio import truncateAudio
-import argparse
-import time
+from whatdisay.utils import TaskProps, millisec, check_file_is_valid, getTaskName
+from whatdisay.diarize import Diarize
+import whatdisay.transcribe as transcribe
+from whatdisay.audio import truncateAudio
+import argparse, yaml
+import re
 import logging
-from pathlib import Path
 import shutil, os
 
-def cli():
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-fe', '--from_existing', type=str, required=True, help="Generated diarized transcriptiion from an existing recording.")
-    parser.add_argument('-t','--raw_transcript_only',action="store_true", help="Set this flag if you just want the transcript without a diarization.")
-    parser.add_argument('--event_name', type=str, required=False)
-    parser.add_argument('-r','--new_recording', action="store_true", help="Will kick off a new recording.")
-    parser.add_argument('--reset','--reset_pipeline', help="Re-pull pyannote's speaker diarization pipeline.")
-    parser.add_argument('--truncate_audio',type=int) # todo - add more handling for default and errors
-    parser.add_argument('--debug', action="store_true", help="Enable debug mode.")
-    parser.add_argument('-dm','--diarization_model', type=str, help="Optionally choose whether to use Deepgram or Pyannote for diarization.")
-    parser.add_argument('-md', '--generate_markdown',action="store_true", help="Generate a markdown version of the final transcript and add tags for Obsidian.")
-    args = parser.parse_args().__dict__
+def configure(args):
+    config = {}
+    config['OBSIDIAN_DIR'] = input("Enter the location for obsidian markdown files to be saved for Obsidian.")
+    config['DEEPGRAM_API_KEY'] = input("Enter your Deepgram API Key.  https://deepgram.com/ ...")
+    config['HUGGINGFACE_TOKEN'] = input("Enter your Huggingface API Token. https://huggingface.co/ ...")
+    config['OUTPUT_DIR'] = input("Optionally specify a directory for all task output to be saved...")
 
-    debug_mode = args.pop('debug')
-    run_from_existing = args.pop('from_existing')
-    just_transcript = args.pop('raw_transcript_only')
-    event_name = args.pop('event_name')
-    reset_pipeline = args.pop('reset')
-    truncate_audio = args.pop('truncate_audio')
-    dia_model = args.pop('diarization_model')
-    generate_md = args.pop('generate_markdown')
+    # Save to a yaml file in the project root directory.
+    BASE_DIR = os.path.abspath(os.path.dirname(__name__))
+    config_file =os.path.join(BASE_DIR, "config.yaml")
+    with open(config_file, 'w') as f:
+        yaml.dump(config, f)
 
-    ts_task = str(int(time.time() * 1000))
+def checkConfig(args: dict):
 
-    if debug_mode:
-        logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)
-        logging.debug("Debug mode enabled.")
+    try:
+        BASE_DIR = os.path.abspath(os.path.dirname(__name__))
+        config_file =os.path.join(BASE_DIR, "config.yaml")
+        with open(config_file, 'r') as f:
+            config = yaml.load(f)
+    except FileNotFoundError:
 
-    if event_name:
-        print('Running task for event with name: {}'.format(event_name))
-    else:
-        event_name = input("Provide a name for this event: ")
-        if event_name == '':
-            event_name = 'new_task'
-        else:
-            event_name = event_name
-    event_name = event_name.replace(' ', '_')
+        print("Library not configured.  Run the CLI with the 'configure' argument first.")
+        return
 
-    tp = TaskProps(event_name,ts_task)
-    tp.createAllTaskDirectories()
+def enableDebugMode():
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    logging.debug("Debug mode enabled.")
 
-    if reset_pipeline:
+def resetPyannotePipe(tp):
         Diarize(tp).reset_pretrained_pipeline()
 
-    # If diarization model specified, enforce that it's either 'd' or 'p'.  Otherwise, default to deepgram.
-    if dia_model:
-        if dia_model != 'p' and dia_model != 'd':
-            raise ValueError("Diarization model must value must be either 'd' or 'p'.")
-    else:
-        dia_model = 'd'
+def runTruncateAudio(args, tp):
+    
+    t = args.pop('truncate_audio')
+    af = t.truncate[0]
+    start = t.truncate[1]
+    end = t.truncate[2]
 
-    if run_from_existing:
-        wav_file = run_from_existing
-        try:
-            Path(wav_file).resolve(strict=True)
-        except FileNotFoundError:
-            print('You did not pass a valid file name.')
-        else:
+    # Check that the time is in the format "HH:mm:SS"
+    if not re.match(r"^\d{2}:\d{2}:\d{2}$", start):
+        raise argparse.ArgumentTypeError("start timestamp must be in the format 'HH:mm:SS'")
+    if not re.match(r"^\d{2}:\d{2}:\d{2}$", end):
+        raise argparse.ArgumentTypeError("end timestamp must be in the format 'HH:mm:SS'")
+
+    if check_file_is_valid(af):
+        t1 = millisec(start)
+        t2 = millisec(end)
+        truncateAudio(af, t1, t2, tp)
+
+def runTranscription(args, tp: TaskProps):
+
+    debug_mode = args.get('debug')
+    get_transcript = args.pop('transcript')
+    diarize = args.pop('diarize')
+    generate_md = args.pop('generate_markdown')
+
+    tp.createAllTaskDirectories()
+
+    # If diarization model specified, enforce that it's either 'deepgram' or 'pyannote'.  
+    if diarize:
+        if diarize not in ["pyannote","deepgram"]:
+            raise ValueError("Invalid value for --diarize argument.  Must be 'deepgram' or 'pyannote'.")
+
+    if get_transcript:
+        wav_file = get_transcript
+        if check_file_is_valid(wav_file):
             
             if generate_md:
                 md_title = input("Input title for markdown file: ")
                 tags = input("Input comma-separated list of tags to add to markdown for Obsidian: ")
 
-            if just_transcript:
-                transcribe.generateWhisperTranscript(wav_file,tp)
-                
-                # Move the whisper transcription to the transcriptions directory before the tmp_dir gets deleted later
-                tmp_whisper = os.path.join(tp.tmp_file_dir, tp.task_name + "_whisper.txt")
-                final_whisper = os.path.join(tp.whisper_transcriptions_dir, tp.task_name + "_whisper.txt")
-                shutil.copy(tmp_whisper, final_whisper)
-                print(f'Saved whisper transcription at: {final_whisper}')
-            
-            else:
-                if dia_model == 'p':
+            if diarize:
+                print(f'Generating transcript using {diarize} for diarization...')
+                if diarize == 'pyannote':
                     transcribe.diarizedTranscriptPyannote(wav_file,tp)
                 else:
                     transcribe.diarizedTranscriptDeepgram(wav_file,tp)
-            
-            # Todo add something to parse input tags and then append them in a format obsidian will like.
+            else:
+                transcribe.generateWhisperTranscript(wav_file,tp)
+                
+                # Move the whisper transcription to the transcriptions directory before the tmp_dir gets deleted later
+                tmp_whisper = os.path.join(tp.whisper_transcriptions_dir, tp.task_name + "_whisper.txt")
+                final_whisper = os.path.join(tp.diarized_transcriptions_dir, tp.task_name + "_whisper.txt")
+                shutil.copy(tmp_whisper, final_whisper)
+                print(f'Saved whisper transcription at: {final_whisper}')
+
             if generate_md:
                 output_file_txt = os.path.join(tp.diarized_transcriptions_dir, tp.task_name + ".txt")
                 output_file_md = os.path.join(tp.diarized_transcriptions_dir, tp.task_name + ".md")
@@ -104,7 +111,8 @@ def cli():
                     for tag in tag_list:
                         obsidian_yaml_block = obsidian_yaml_block + f'\n- {tag}'
 
-                    obsidian_yaml_block = obsidian_yaml_block + '\n---\n'
+                    obsidian_yaml_block = obsidian_yaml_block + '\n---'
+                    md_file.write('\n')
 
                     md_file.write(obsidian_yaml_block)
                     md_file.write(f'# {md_title}\n')
@@ -113,21 +121,50 @@ def cli():
                     with open(output_file_txt,"r") as txt_file:
                         for line in txt_file:
                             md_file.write(line.strip())
-
+                            md_file.write('\n')
+                    af_ctime = os.path.getctime(wav_file)
+                    md_file.write(f'\n\n\nTranscript generated from audio file originally created at: {af_ctime}')
+                    print(f'Saved Markdown file at location: {output_file_md}')
                     
             # Now that the job is done, delete the tmp files unless debug mode is on, in which case we'll save them for troubleshoting.
             if not debug_mode:
                 tp.cleanupTask()
 
-    # if truncate_audio:
-    #     wav_file = run_from_existing
-    #     try:
-    #         Path(wav_file).resolve(strict=True)
-    #     except FileNotFoundError:
-    #         print('You did not pass a valid file name.')
-    #     else:
-    #         t2: int = 3 * 60 * 1000
-    #         truncateAudio(0,t2,wav_file,tp)
+def cli():
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    exclusive_group = parser.add_mutually_exclusive_group(required=False)
+    exclusive_group.add_argument('--configure', action='store_true', help="Configure the CLI and create or update config yaml file.")
+    exclusive_group.add_argument('--transcript', type=str, required=False, help="Generated diarized transcriptiion from an existing recording. Requires the path to the audio file you need a transcript of.")
+    exclusive_group.add_argument('--new_recording', help="Will kick off a new recording.")
+    exclusive_group.add_argument('--truncate_audio', nargs=3, required=False, help="Trim an audio file using timestamps provided.")
+    parser.add_argument('--diarize', nargs='?', const='deepgram', type=str, help="Diarize the transcript. Defaults to Deepgram for diarization model unless 'pyannote' is passed as a value.")
+    # parser.add_argument('--dia_model', type=str, choices=["deepgram","pyannote"])
+    parser.add_argument('--event_name', type=str, required=False)
+    parser.add_argument('--reset_pipeline', help="Re-pull pyannote's speaker diarization pipeline.")
+    parser.add_argument('--debug', action="store_true", help="Enable debug mode.")
+    parser.add_argument('-md', '--generate_markdown',action="store_true", help="Generate a markdown version of the final transcript and add tags for Obsidian.")
+    args = parser.parse_args().__dict__
+
+    if args.get('debug'):
+        enableDebugMode()
+    
+    task_name: str = getTaskName(args)
+    tp = TaskProps(task_name)
+
+    if args.get('configure'):
+        configure(args)
+    else:
+        checkConfig(args)
+
+    if args.get('reset_pipeline'):
+        resetPyannotePipe(tp)
+    elif args.get('transcript'):
+        runTranscription(args, tp)
+    elif args.get('truncate_audio'):
+        runTruncateAudio(args, tp)
+    else:
+        parser.print_help()
 
 if __name__ == '__main__':
     cli()

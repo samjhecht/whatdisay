@@ -2,14 +2,46 @@
 
 import os
 import shutil
+from pathlib import Path
 from pydub import AudioSegment
+import time
 from dotenv import load_dotenv
 
+def getTaskName(args:dict) -> str:
 
-def millisec(timeStr: str):
+    event_name = args.pop('event_name')
+    ts_task: str = str(int(time.time() * 1000))
+
+    if not event_name:
+        event_name = input("Provide a name for this event: ")
+        if event_name == '':
+            event_name = ''
+        else:
+            event_name = event_name.replace(' ', '_')
+            event_name = event_name + '_'
+    else:
+        event_name = event_name.replace(' ', '_')
+        event_name = event_name + '_'
+    
+    event_name = event_name + ts_task
+    
+    print(f'Running task for event with name: {event_name}')
+    return event_name
+
+def millisec(timeStr: str) -> int:
   spl = timeStr.split(":")
   s = (int)((int(spl[0]) * 60 * 60 + int(spl[1]) * 60 + float(spl[2]) )* 1000)
   return s
+
+def check_file_is_valid(f: str) -> bool:
+    if not Path(f).resolve(strict=True):
+        raise FileNotFoundError(f"Audio file not found at: {f}")
+    
+    filename, file_extension = os.path.splitext(f)
+    if file_extension != ".wav":
+        raise ValueError("Audio file must be '.wav' format.  Other filetypes not yet supported.")
+
+    return True
 
 # Add 0.5 second buffer to beginning of audio file to avoid loss on transcription.  accepts audio file name.
 def addIntroSpacer(input_audio,output_dir):
@@ -24,12 +56,12 @@ def addIntroSpacer(input_audio,output_dir):
 
 class TaskProps:
 
-    def __init__(self, event_name, task_ts):
-        self.task_name = event_name + '_' + task_ts
-        self.event_name = event_name
+    def __init__(self, task_name):
+        self.task_name = task_name
         self.output_dir = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__name__))) + '/output/'
         self.diarized_transcriptions_dir = self.output_dir + 'diarized_transcriptions/'
-        self.task_dir = self.output_dir + 'tasks/' + str(self.task_name) + '/'
+        self.tasks_dir = self.output_dir + 'tasks/'
+        self.task_dir = self.tasks_dir + str(self.task_name) + '/'
         self.tmp_file_dir = self.task_dir + 'tmp_files/' 
         self.dia_segments_dir = self.tmp_file_dir + 'audio_segments/' 
         self.whisper_transcriptions_dir = self.tmp_file_dir + 'whisper_transcriptions/'
@@ -49,6 +81,12 @@ class TaskProps:
         if not os.path.exists(self.output_dir):
             print('Output directory not detected.  creating one..')
             os.makedirs(self.output_dir)
+        if not os.path.exists(self.tasks_dir):
+            print('Output directory not detected.  creating one..')
+            os.makedirs(self.tasks_dir)
+        if not os.path.exists(self.task_dir):
+            print('Output directory not detected.  creating one..')
+            os.makedirs(self.task_dir)
         if not os.path.exists(self.tmp_file_dir):
             print('Tmp file directory not detected.  creating one..')
             os.makedirs(self.tmp_file_dir)

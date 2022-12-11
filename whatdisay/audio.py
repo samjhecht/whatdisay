@@ -50,7 +50,7 @@ def recordAudio(wf):
     # print('Recording saved at: {}'.format(WAVE_OUTPUT_FILENAME))
 
 
-def truncateAudio(t1,t2,audio_file, file_names: TaskProps):
+def truncateAudio(audio_file, t1: int, t2: int, file_names: TaskProps):
 
     newAudio = AudioSegment.from_wav(audio_file)
     a = newAudio[t1:t2]
