@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import shutil
 from pathlib import Path
 from pydub import AudioSegment
 import time
-from dotenv import load_dotenv
 
 def getTaskName(args:dict) -> str:
 
-    event_name = args.pop('event_name')
+    event_name = args.get('event_name')
     ts_task: str = str(int(time.time() * 1000))
 
     if not event_name:
@@ -23,7 +23,7 @@ def getTaskName(args:dict) -> str:
         event_name = event_name.replace(' ', '_')
         event_name = event_name + '_'
     
-    event_name = event_name + ts_task
+    event_name = event_name.lower() + ts_task
     
     print(f'Running task for event with name: {event_name}')
     return event_name
@@ -70,7 +70,6 @@ class TaskProps:
         self.new_recordings_dir = self.output_dir + 'new_recordings/'
         self.pyannote_diarization_txt = os.path.join(self.tmp_file_dir,'diarization.txt')
         self.diarized_audio_file = os.path.join(self.tmp_file_dir, 'dz.wav')
-        self.obsidian_dir = os.environ.get('OBSIDIAN_DIRECTORY_LOCATION')
 
     def createTaskDir(self,dir):
         if not os.path.exists(dir):
@@ -122,40 +121,60 @@ class TaskProps:
             print('No tmp directory found for task: {}'.format(self.task_name))
 
 
-class ObsidianHelper:
+class MdFileUtil:
 
-    def __init__(self, base_file: str, tp: TaskProps):
-        self.base_file = base_file
-        self.md_file = self.get_md_file()
-        self.task_name: str = tp.task_name
+    def __init__(self, in_file: str, tags: str, title: str, tp: TaskProps):
+        self.in_file = in_file
+        self.tags = tags.replace(' ', '-').split(',')
+        self.title = title
+        self.diarized_transcriptions_dir = tp.diarized_transcriptions_dir
         self.obsidian_dir: str = tp.obsidian_dir
+        self.out_file = self.get_md_file()
+        self.add_tags = self.add_tags_and_title()
     
     def get_md_file(self):
-        if os.path.exists(self.base_file) and self.base_file.endswith('.md'):
-            md_file = open(self.base_file, 'w+', encoding="utf-8")
-            md_file.close()
-        else:
-            raise Exception(f'No markdown file found at {self.base_file}')
-        return md_file
 
-    def add_tags(self, tags:str):
-        tag_list = tags.replace(' ', '-').split(',')
+        try:
+            if Path(self.in_file).resolve(strict=True):
+                n = Path(self.in_file).stem
+                outfile_path = os.path.join(self.diarized_transcriptions_dir, n + '.md')
+                md_file = open(outfile_path, 'w+', encoding="utf-8")
+                md_file.close()
+                print(f'Creating new markdown file at: {outfile_path}')
+        
+        except FileNotFoundError:
+
+            print(f"No input file found at {self.in_file}.")
+            sys.exit(1)
+        
+        return outfile_path
+
+    def add_tags_and_title(self):
+        
+        tag_list = self.tags
         
         obsidian_yaml_block = """---\ntags:"""
 
         for tag in tag_list:
-            obsidian_yaml_block = obsidian_yaml_block + f'\n- {tag}'
+            obsidian_yaml_block = obsidian_yaml_block + f"\n- {tag}"
 
-        obsidian_yaml_block = obsidian_yaml_block + '\n---'
+        obsidian_yaml_block = obsidian_yaml_block + "\n---"
         
-        self.append_at_beginning(obsidian_yaml_block)
+        with open(self.out_file, 'r+', encoding="utf-8") as md_file:
+            existing_data = md_file.read()
+            md_file.seek(0,0)
+            md_file.write(obsidian_yaml_block)
+            md_file.write("\n")
+            md_file.write(f'# {self.title}')
+            md_file.write("\n" + existing_data)
 
-    def append_at_beginning(self, new_data):
-        with open(self.base_file, 'r+', encoding="utf-8") as self.md_file:
-            existing_data = self.md_file.read()
-            self.md_file.seek(0,0)
-            self.md_file.write(new_data)
-            self.md_file.write('\n' + existing_data)
-        self.md_file.close()
+    def append_line(self, t):
+
+        with open(self.out_file, 'a', encoding="utf-8") as md_file:
+            md_file.write(t)
+            md_file.write("\n")
+
+
+    
 
 

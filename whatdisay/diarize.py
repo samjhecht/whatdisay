@@ -2,8 +2,8 @@
 
 from pyannote.audio import Pipeline
 from whatdisay.utils import TaskProps
+from whatdisay.config import Config
 from pydub import AudioSegment
-from dotenv import load_dotenv, find_dotenv
 import os, shutil
 import re
 from deepgram import Deepgram
@@ -37,8 +37,7 @@ class Diarize():
         
         pipe_type: str = 'pyannote/speaker-diarization'
 
-        load_dotenv()
-        huggingface_token = os.environ.get('HUGGINGFACE_TOKEN')
+        huggingface_token = Config().get_param('HUGGINGFACE_TOKEN')
 
         print('instantiating pretrained pipeline')
         cd = self.pipelines_cash_dir
@@ -52,14 +51,13 @@ class Diarize():
         audio_intro_spacer = self.add_intro_spacer(audio_file)
         new_audio = os.path.join(self.tmp_file_dir,'spaced_audio.wav')
         audio_intro_spacer.export(new_audio,format="wav")
-        print('Added intro spacer to audio_file and saved new wav file at: {}'.format(new_audio))
+        print(f'Added intro spacer to audio_file and saved new wav file at: {new_audio}')
 
         pipeline = self.load_pipeline()
         # apply the pipeline to an audio file
         print('Applying the pipeline to audio file')
         diarization = pipeline(new_audio)
-        # print(*list(diarization.itertracks(yield_label = True))[:10], sep="\n")
-        print('Finished applying pipeline to audio_file named: {}'.format(new_audio))
+        print(f'Finished applying pipeline to audio_file named: {new_audio}')
         return diarization
 
 
@@ -132,9 +130,8 @@ class Diarize():
 
     async def diarize_deepgram(self, audio_file):
 
-        BASE_DIR = os.path.abspath(os.path.dirname(__name__))
-        load_dotenv(dotenv_path=os.path.join(BASE_DIR, ".env"))
-        deepgram_api_key = os.environ.get('DEEPGRAM_API_KEY')
+        deepgram_api_key = Config().get_param('DEEPGRAM_API_KEY')
+        deepgram_model = Config().get_param('DEEPGRAM_MODEL')
 
         # Initialize the Deepgram SDK
         deepgram = Deepgram(deepgram_api_key)
@@ -150,8 +147,7 @@ class Diarize():
                         'diarize': True, 
                         'utterances': True,
                         'tier': 'enhanced', 
-                        # 'model': 'whisper'}
-                        'model': 'meeting'}
+                        'model': deepgram_model}
                 )
             )
 
@@ -159,9 +155,9 @@ class Diarize():
         j = json.loads(output_json)
         utterances = j['results']['utterances']
 
-        # deepgram_to_file = os.path.join(self.tmp_file_dir,'deepgram_output.json')
-        # with open(deepgram_to_file,'w',encoding='utf-8') as f:
-        #     json.dump(response,f, ensure_ascii=False, indent=4)
+        deepgram_to_file = os.path.join(self.tmp_file_dir,'deepgram_output.json')
+        with open(deepgram_to_file,'w',encoding='utf-8') as f:
+            json.dump(response,f, ensure_ascii=False, indent=4)
             
         segments = []
         if utterances:
@@ -207,8 +203,7 @@ class Diarize():
             print('No cached pipeline found.  proceeding to download one.')
         
         cd = self.pipelines_cash_dir
-        load_dotenv()
-        huggingface_token = os.environ.get('HUGGINGFACE_TOKEN')
+        huggingface_token = Config().get_param('HUGGINGFACE_TOKEN')
 
         try:
             pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization',use_auth_token=huggingface_token,cache_dir=cd)

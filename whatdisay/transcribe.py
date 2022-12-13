@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 
 from whatdisay.utils import TaskProps, millisec
+from whatdisay.config import Config
 from pydub import AudioSegment
 from whatdisay.diarize import Diarize
-from pathlib import Path
 from whatdisay.audio import truncateAudio
 import asyncio
 import os
 import re
-import json
 import webvtt
 import whisper
 from whisper.utils import write_txt,write_vtt
 
 
-def generateWhisperTranscript(wav_file, tp: TaskProps, model="medium", custom_name=""):
+def generateWhisperTranscript(wav_file, tp: TaskProps, model="large", custom_name=""):
     """
     Uses OpenAI Whisper to generate a transcription from an audio file.
 
@@ -60,7 +59,7 @@ def generateWhisperTranscript(wav_file, tp: TaskProps, model="medium", custom_na
 
 
 
-def diarizedTranscriptPyannote(wav_file, tp: TaskProps, model="medium"):
+def diarizedTranscriptPyannote(wav_file, tp: TaskProps):
     """
     Run the whole shebang. Use Pyannote to create diarization and OpenAI Whisper to generate a transcription from an audio file.
     Then combine the results to create diarized transcript. 
@@ -73,10 +72,8 @@ def diarizedTranscriptPyannote(wav_file, tp: TaskProps, model="medium"):
     tp: TaskProps
         An instantiated utils.TaskProps class that provides all the necessary directory names.
     
-    model: str
-        The whisper model instance (tiny, base, small, medium, large).   Will default to 'medium' if not set.
     """
-
+    whisper_model = Config().get_param('WHISPER_MODEL')
     dz = Diarize(tp,3).diarize_pyannote(wav_file)
     groups = dz[0]
     gidx = dz[1]
@@ -86,7 +83,7 @@ def diarizedTranscriptPyannote(wav_file, tp: TaskProps, model="medium"):
 
     for i in range(gidx+1):
         segment_audio_filename = tp.dia_segments_dir, str(gidx) + '.wav'
-        generateWhisperTranscript(segment_audio_filename, tp,'large', i)
+        generateWhisperTranscript(segment_audio_filename, tp, whisper_model, i)
     
     gidx = -1
 
@@ -112,7 +109,7 @@ def diarizedTranscriptPyannote(wav_file, tp: TaskProps, model="medium"):
     print(f'Saved diarized transcript at location: {final_output_file}')
 
 
-def getWhisperTxt(wav_file, model="medium"):
+def getWhisperTxt(wav_file, model="large"):
 
     print(f'Beginning Whisper transcription from {wav_file}')
     model = whisper.load_model(model)
@@ -124,8 +121,7 @@ def getWhisperTxt(wav_file, model="medium"):
 
 def diarizedTranscriptDeepgram(
     wav_file, 
-    tp: TaskProps, 
-    model="large"
+    tp: TaskProps
     ):
     """
     Run the whole shebang. Use Deepgram to get the speaker diarization segments and then run OpenAI Whisper
@@ -138,11 +134,9 @@ def diarizedTranscriptDeepgram(
 
     tp: TaskProps
         An instantiated utils.TaskProps class that provides all the necessary directory names.
-    
-    model: str
-        The Whisper model instance (tiny, base, small, medium, large).   Will default to 'large' if not set.
-    """
 
+    """
+    whisper_model = Config().get_param('WHISPER_MODEL')
     dz = asyncio.run(Diarize(tp).diarize_deepgram(wav_file))
 
     audio = AudioSegment.from_wav(wav_file)
@@ -166,11 +160,11 @@ def diarizedTranscriptDeepgram(
         for i in range(len(dz)):
             segment_audio = os.path.join(tp.dia_segments_dir, str(i) + '.wav')
             speaker = 'Speaker_' + str(dz[i][2])
-            w = getWhisperTxt(segment_audio,"large")
+            w = getWhisperTxt(segment_audio, whisper_model)
 
-            text_file.write(f'{speaker}: {w}\n')
-            print(f'{speaker}: {w}')
+            if w:
+                text_file.write(f'{speaker}: {w}\n')
+                print(f'{speaker}: {w}')
 
     print(f'Saved diarized transcript at location: {final_output_file}')
 
-        

@@ -1,39 +1,16 @@
 #!/usr/bin/env python3
 
-from whatdisay.utils import TaskProps, millisec, check_file_is_valid, getTaskName
+from whatdisay.utils import TaskProps, MdFileUtil, millisec, check_file_is_valid, getTaskName
+from whatdisay.config import Config
 from whatdisay.diarize import Diarize
 import whatdisay.transcribe as transcribe
 from whatdisay.audio import truncateAudio
-import argparse, yaml
+from datetime import datetime
+import argparse
 import re
 import logging
 import shutil, os
-
-
-def configure(args):
-    config = {}
-    config['OBSIDIAN_DIR'] = input("Enter the location for obsidian markdown files to be saved for Obsidian.")
-    config['DEEPGRAM_API_KEY'] = input("Enter your Deepgram API Key.  https://deepgram.com/ ...")
-    config['HUGGINGFACE_TOKEN'] = input("Enter your Huggingface API Token. https://huggingface.co/ ...")
-    config['OUTPUT_DIR'] = input("Optionally specify a directory for all task output to be saved...")
-
-    # Save to a yaml file in the project root directory.
-    BASE_DIR = os.path.abspath(os.path.dirname(__name__))
-    config_file =os.path.join(BASE_DIR, "config.yaml")
-    with open(config_file, 'w') as f:
-        yaml.dump(config, f)
-
-def checkConfig(args: dict):
-
-    try:
-        BASE_DIR = os.path.abspath(os.path.dirname(__name__))
-        config_file =os.path.join(BASE_DIR, "config.yaml")
-        with open(config_file, 'r') as f:
-            config = yaml.load(f)
-    except FileNotFoundError:
-
-        print("Library not configured.  Run the CLI with the 'configure' argument first.")
-        return
+import sys
 
 def enableDebugMode():
     logger = logging.getLogger()
@@ -41,7 +18,7 @@ def enableDebugMode():
     logging.debug("Debug mode enabled.")
 
 def resetPyannotePipe(tp):
-        Diarize(tp).reset_pretrained_pipeline()
+    Diarize(tp).reset_pretrained_pipeline()
 
 def runTruncateAudio(args, tp):
     
@@ -90,7 +67,8 @@ def runTranscription(args, tp: TaskProps):
                 else:
                     transcribe.diarizedTranscriptDeepgram(wav_file,tp)
             else:
-                transcribe.generateWhisperTranscript(wav_file,tp)
+                whisper_model = Config().get_param('WHISPER_MODEL')
+                transcribe.generateWhisperTranscript(wav_file,tp, whisper_model)
                 
                 # Move the whisper transcription to the transcriptions directory before the tmp_dir gets deleted later
                 tmp_whisper = os.path.join(tp.whisper_transcriptions_dir, tp.task_name + "_whisper.txt")
@@ -102,29 +80,15 @@ def runTranscription(args, tp: TaskProps):
                 output_file_txt = os.path.join(tp.diarized_transcriptions_dir, tp.task_name + ".txt")
                 output_file_md = os.path.join(tp.diarized_transcriptions_dir, tp.task_name + ".md")
 
-                with open(output_file_md, "w", encoding="utf-8") as md_file:
+                md_file = MdFileUtil(output_file_txt, tags, md_title, tp)
 
-                    tag_list = tags.replace(' ', '-').split(',')
-                    
-                    obsidian_yaml_block = """---\ntags:"""
+                with open(output_file_txt, "r") as txt_file:
+                    for line in txt_file:
+                        md_file.append_line(line.strip())
 
-                    for tag in tag_list:
-                        obsidian_yaml_block = obsidian_yaml_block + f'\n- {tag}'
-
-                    obsidian_yaml_block = obsidian_yaml_block + '\n---'
-                    md_file.write('\n')
-
-                    md_file.write(obsidian_yaml_block)
-                    md_file.write(f'# {md_title}\n')
-                    md_file.write('\n')
-
-                    with open(output_file_txt,"r") as txt_file:
-                        for line in txt_file:
-                            md_file.write(line.strip())
-                            md_file.write('\n')
-                    af_ctime = os.path.getctime(wav_file)
-                    md_file.write(f'\n\n\nTranscript generated from audio file originally created at: {af_ctime}')
-                    print(f'Saved Markdown file at location: {output_file_md}')
+                af_ctime = datetime.fromtimestamp(os.path.getctime(wav_file)).strftime('%Y-%m-%dT%H:%M:%S')
+                md_file.append_line(f'\n\n\nTranscript generated from audio file originally created at: {af_ctime}')
+                print(f'Saved Markdown file at location: {output_file_md}')
                     
             # Now that the job is done, delete the tmp files unless debug mode is on, in which case we'll save them for troubleshoting.
             if not debug_mode:
@@ -148,14 +112,15 @@ def cli():
 
     if args.get('debug'):
         enableDebugMode()
-    
-    task_name: str = getTaskName(args)
-    tp = TaskProps(task_name)
 
     if args.get('configure'):
-        configure(args)
+        Config().configure()
+        sys.exit(1)
     else:
-        checkConfig(args)
+        Config().get_config()
+
+    task_name: str = getTaskName(args)
+    tp = TaskProps(task_name)
 
     if args.get('reset_pipeline'):
         resetPyannotePipe(tp)
