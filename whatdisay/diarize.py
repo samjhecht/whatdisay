@@ -9,6 +9,7 @@ import re
 from deepgram import Deepgram
 import json
 import asyncio
+import aiofiles
 
 
 class Diarize():
@@ -130,6 +131,7 @@ class Diarize():
 
     async def diarize_deepgram(self, audio_file):
 
+        print('Getting speaker diarization using Deepgram...')
         deepgram_api_key = Config().get_param('DEEPGRAM_API_KEY')
         deepgram_model = Config().get_param('DEEPGRAM_MODEL')
 
@@ -138,7 +140,6 @@ class Diarize():
 
         with open(audio_file,'rb') as audio:
             source = {'buffer': audio, 'mimetype': 'audio/wav'}
-
             response = await asyncio.create_task(
                 deepgram.transcription.prerecorded(
                     source,
@@ -188,6 +189,8 @@ class Diarize():
             # add the last row
             segments.append([previous_start, previous_end, previous_speaker, current_caption])
         
+        print('Finished getting speaker diarization using Deepgram.')
+
         return segments
 
 

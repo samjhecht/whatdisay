@@ -6,6 +6,8 @@ from whatdisay.diarize import Diarize
 import whatdisay.transcribe as transcribe
 from whatdisay.audio import truncateAudio
 from datetime import datetime
+import asyncio
+import time
 import argparse
 import re
 import logging
@@ -40,6 +42,8 @@ def runTruncateAudio(args, tp):
 
 def runTranscription(args, tp: TaskProps):
 
+    start_time = time.time()
+    
     debug_mode = args.get('debug')
     get_transcript = args.pop('transcript')
     diarize = args.pop('diarize')
@@ -49,7 +53,7 @@ def runTranscription(args, tp: TaskProps):
 
     # If diarization model specified, enforce that it's either 'deepgram' or 'pyannote'.  
     if diarize:
-        if diarize not in ["pyannote","deepgram"]:
+        if diarize not in ["pyannote","deepgram","whisper_local"]:
             raise ValueError("Invalid value for --diarize argument.  Must be 'deepgram' or 'pyannote'.")
 
     if get_transcript:
@@ -62,10 +66,18 @@ def runTranscription(args, tp: TaskProps):
 
             if diarize:
                 print(f'Generating transcript using {diarize} for diarization...')
+                start_time = time.time()
                 if diarize == 'pyannote':
                     transcribe.diarizedTranscriptPyannote(wav_file,tp)
+                elif diarize == 'whisper_local':
+                    whisper_model = Config().get_param('WHISPER_MODEL')
+                    asyncio.run(transcribe.diarizedTranscriptDeepgramWhisperLocal(wav_file, whisper_model, tp))
+                    run_time = time.time() - start_time
+                    print(f'whisper local run time: {run_time}')
                 else:
-                    transcribe.diarizedTranscriptDeepgram(wav_file,tp)
+                    asyncio.run(transcribe.diarizedTranscriptAllDeepgram(wav_file,tp))
+                    run_time = time.time() - start_time
+                    print(f'async deepgram run time: {run_time}')
             else:
                 whisper_model = Config().get_param('WHISPER_MODEL')
                 transcribe.generateWhisperTranscript(wav_file,tp, whisper_model)
@@ -103,7 +115,7 @@ def cli():
     exclusive_group.add_argument('--new_recording', help="Will kick off a new recording.")
     exclusive_group.add_argument('--truncate_audio', nargs=3, required=False, help="Trim an audio file using timestamps provided.")
     parser.add_argument('--diarize', nargs='?', const='deepgram', type=str, help="Diarize the transcript. Defaults to Deepgram for diarization model unless 'pyannote' is passed as a value.")
-    # parser.add_argument('--dia_model', type=str, choices=["deepgram","pyannote"])
+    # parser.add_argument('--dia_method', type=str, choices=["async","just_deepgram", "whisper_local"])
     parser.add_argument('--event_name', type=str, required=False)
     parser.add_argument('--reset_pipeline', help="Re-pull pyannote's speaker diarization pipeline.")
     parser.add_argument('--debug', action="store_true", help="Enable debug mode.")
