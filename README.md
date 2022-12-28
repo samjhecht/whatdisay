@@ -17,7 +17,7 @@ The following command will pull and install the latest commit from this reposito
 
 To update the package to the latest version of this repository, please run:
 
-    pip install --upgrade --no-deps --force-reinstall git+https://github.com/openai/samjhecht/whatdisay.git
+    pip install --upgrade --no-deps --force-reinstall git+https://github.com/samjhecht/whatdisay.git
 
 ## CLI Usage
 
