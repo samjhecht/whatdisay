@@ -128,7 +128,6 @@ class MdFileUtil:
         self.tags = tags.replace(' ', '-').split(',')
         self.title = title
         self.diarized_transcriptions_dir = tp.diarized_transcriptions_dir
-        self.obsidian_dir: str = tp.obsidian_dir
         self.out_file = self.get_md_file()
         self.add_tags = self.add_tags_and_title()
     
@@ -151,22 +150,23 @@ class MdFileUtil:
 
     def add_tags_and_title(self):
         
-        tag_list = self.tags
-        
-        obsidian_yaml_block = """---\ntags:"""
+        if self.tags:
 
-        for tag in tag_list:
-            obsidian_yaml_block = obsidian_yaml_block + f"\n- {tag}"
+            tag_list = self.tags
+            obsidian_yaml_block = """---\ntags:"""
 
-        obsidian_yaml_block = obsidian_yaml_block + "\n---"
-        
-        with open(self.out_file, 'r+', encoding="utf-8") as md_file:
-            existing_data = md_file.read()
-            md_file.seek(0,0)
-            md_file.write(obsidian_yaml_block)
-            md_file.write("\n")
-            md_file.write(f'# {self.title}')
-            md_file.write("\n" + existing_data)
+            for tag in tag_list:
+                obsidian_yaml_block = obsidian_yaml_block + f"\n- {tag}"
+
+            obsidian_yaml_block = obsidian_yaml_block + "\n---"
+            
+            with open(self.out_file, 'r+', encoding="utf-8") as md_file:
+                existing_data = md_file.read()
+                md_file.seek(0,0)
+                md_file.write(obsidian_yaml_block)
+                md_file.write("\n")
+                md_file.write(f'# {self.title}')
+                md_file.write("\n" + existing_data)
 
     def append_line(self, t):
 
