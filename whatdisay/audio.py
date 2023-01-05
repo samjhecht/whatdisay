@@ -1,12 +1,16 @@
 import pyaudio
 import wave
 from pydub import AudioSegment
-
+from pathlib import Path
 from whatdisay.utils import TaskProps, millisec
 
 
 
-def convertAudio(audio_file):
+def convertAudio(m4a_file):
+
+    # n = Path(m4a_file).stem
+    # track = AudioSegment.from_file(audio_file,  format= 'm4a')
+    # file_handle = track.export(wav_filename, format='wav')
     return str('Make this function work.')
 
 def recordAudio(wf):

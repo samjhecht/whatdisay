@@ -13,6 +13,7 @@ import re
 import webvtt
 import whisper
 from whisper.utils import write_txt,write_vtt
+from aiohttp.client_exceptions import ClientResponseError
 
 
 def generateWhisperTranscript(wav_file, tp: TaskProps, model="large", custom_name=""):
@@ -220,8 +221,9 @@ async def diarizedTranscriptAllDeepgram(
         An instantiated utils.TaskProps class that provides all the necessary directory names.
 
     """
+
     dz = await Diarize(tp).diarize_deepgram(wav_file)
-    
+
     audio = AudioSegment.from_wav(wav_file)
 
     # Make sure there's a directory to save the audio segment files in
@@ -234,7 +236,12 @@ async def diarizedTranscriptAllDeepgram(
         end = float(segment[1]) * 1000
 
         output_af_name = os.path.join(tp.dia_segments_dir + str(idx) + '.wav')
-        audio[start:end].export(output_af_name, format='wav')
+        extract = audio[start:end]
+        
+        # As of now there seems to be a server error thrown if file size is too small when uploaded to deepgram.  add spacer to be safe.
+        spacer = AudioSegment.silent(duration=2000)
+        add_spacer = spacer.append(extract,crossfade=0)
+        add_spacer.export(output_af_name, format='wav')
         idx += 1
 
     deepgram_api_key = Config().get_param('DEEPGRAM_API_KEY')
@@ -275,8 +282,12 @@ async def diarizedTranscriptAllDeepgram(
                     print(result)
                 else:
                     result = ""
+        except ClientResponseError as e:
+            print(f'Error while getting transcript for task {i}: {str(e)}')
+            raise
         except Exception as e:
-            print('Error while sending: ', + str(e))
+            print(f'task of error: {i}')
+            print(f'Error while getting transcript for task {i}: {str(e)}')
             raise
 
         return result
@@ -288,7 +299,7 @@ async def diarizedTranscriptAllDeepgram(
         coroutines.append(get_transcript(i,speaker,af))
 
     print('Getting whisper transcripts from Deepgram...')
-    result_list = await gather_with_concurrency_limit(10, *coroutines)
+    result_list = await gather_with_concurrency_limit(50, *coroutines)
     
     final_output_file = f'{tp.diarized_transcriptions_dir}/{tp.task_name}.txt'
 

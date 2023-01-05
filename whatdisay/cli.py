@@ -84,7 +84,7 @@ def runTranscription(args, tp: TaskProps):
                 
                 # Move the whisper transcription to the transcriptions directory before the tmp_dir gets deleted later
                 tmp_whisper = os.path.join(tp.whisper_transcriptions_dir, tp.task_name + "_whisper.txt")
-                final_whisper = os.path.join(tp.diarized_transcriptions_dir, tp.task_name + "_whisper.txt")
+                final_whisper = os.path.join(tp.diarized_transcriptions_dir, tp.task_name + ".txt")
                 shutil.copy(tmp_whisper, final_whisper)
                 print(f'Saved whisper transcription at: {final_whisper}')
 
@@ -112,10 +112,8 @@ def cli():
     exclusive_group = parser.add_mutually_exclusive_group(required=False)
     exclusive_group.add_argument('--configure', action='store_true', help="Configure the CLI and create or update config yaml file.")
     exclusive_group.add_argument('--transcript', type=str, required=False, help="Generated diarized transcriptiion from an existing recording. Requires the path to the audio file you need a transcript of.")
-    exclusive_group.add_argument('--new_recording', help="Will kick off a new recording.")
     exclusive_group.add_argument('--truncate_audio', nargs=3, required=False, help="Trim an audio file using timestamps provided.")
     parser.add_argument('--diarize', nargs='?', const='deepgram', type=str, help="Diarize the transcript. Defaults to Deepgram for diarization model unless 'pyannote' is passed as a value.")
-    # parser.add_argument('--dia_method', type=str, choices=["async","just_deepgram", "whisper_local"])
     parser.add_argument('--event_name', type=str, required=False)
     parser.add_argument('--reset_pipeline', help="Re-pull pyannote's speaker diarization pipeline.")
     parser.add_argument('--debug', action="store_true", help="Enable debug mode.")
@@ -145,3 +143,4 @@ def cli():
 
 if __name__ == '__main__':
     cli()
+
