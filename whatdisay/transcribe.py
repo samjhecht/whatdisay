@@ -224,6 +224,40 @@ async def diarizedTranscriptAllDeepgram(
 
     dz = await Diarize(tp).diarize_deepgram(wav_file)
 
+    # Make sure there's a directory to save the audio segment files in
+    tp.createTaskDir(tp.dia_segments_dir)
+    final_output_file = f'{tp.diarized_transcriptions_dir}/{tp.task_name}.txt'
+    
+    with open(final_output_file, "w", encoding="utf-8") as text_file:
+
+        for i in range(len(dz)):
+            speaker = 'Speaker_' + str(dz[i][2])
+            caption = str(dz[i][3])
+            text_file.write(f'{speaker}: {caption}\n')
+        
+    print(f'Saved diarized transcript at location: {final_output_file}')
+
+async def diarizedTranscriptDeepgramWhisper(
+    wav_file, 
+    tp: TaskProps
+    ):
+    """
+    Run the whole shebang. Use Deepgram to get the speaker diarization segments and then leverage Deepgram's API torun OpenAI Whisper
+    over each segment to generate a transcription from an audio file instead of doing the whisper transcription locally.
+    Then combine the results to create diarized transcript. 
+
+    Parameters
+    ----------
+    wav_file: str
+        The path to the audio file from which you would like a diarized transcription.
+
+    tp: TaskProps
+        An instantiated utils.TaskProps class that provides all the necessary directory names.
+
+    """
+
+    dz = await Diarize(tp).diarize_deepgram(wav_file)
+
     audio = AudioSegment.from_wav(wav_file)
 
     # Make sure there's a directory to save the audio segment files in

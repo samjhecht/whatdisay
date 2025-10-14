@@ -53,7 +53,7 @@ def runTranscription(args, tp: TaskProps):
 
     # If diarization model specified, enforce that it's either 'deepgram' or 'pyannote'.  
     if diarize:
-        if diarize not in ["pyannote","deepgram","whisper_local"]:
+        if diarize not in ["pyannote","all_deepgram","whisper_local","deepgram_whisper"]:
             raise ValueError("Invalid value for --diarize argument.  Must be 'deepgram' or 'pyannote'.")
 
     if get_transcript:
@@ -74,8 +74,12 @@ def runTranscription(args, tp: TaskProps):
                     asyncio.run(transcribe.diarizedTranscriptDeepgramWhisperLocal(wav_file, whisper_model, tp))
                     run_time = time.time() - start_time
                     print(f'whisper local run time: {run_time}')
-                else:
+                elif diarize == 'all_deepgram':
                     asyncio.run(transcribe.diarizedTranscriptAllDeepgram(wav_file,tp))
+                    run_time = time.time() - start_time
+                    print(f'async deepgram run time: {run_time}')
+                else:
+                    asyncio.run(transcribe.diarizedTranscriptDeepgramWhisper(wav_file,tp))
                     run_time = time.time() - start_time
                     print(f'async deepgram run time: {run_time}')
             else:
@@ -105,7 +109,7 @@ def runTranscription(args, tp: TaskProps):
             # Now that the job is done, delete the tmp files unless debug mode is on, in which case we'll save them for troubleshoting.
             if not debug_mode:
                 tp.cleanupTask()
-
+                
 def cli():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -113,7 +117,7 @@ def cli():
     exclusive_group.add_argument('--configure', action='store_true', help="Configure the CLI and create or update config yaml file.")
     exclusive_group.add_argument('--transcript', type=str, required=False, help="Generated diarized transcriptiion from an existing recording. Requires the path to the audio file you need a transcript of.")
     exclusive_group.add_argument('--truncate_audio', nargs=3, required=False, help="Trim an audio file using timestamps provided.")
-    parser.add_argument('--diarize', nargs='?', const='deepgram', type=str, help="Diarize the transcript. Defaults to Deepgram for diarization model unless 'pyannote' is passed as a value.")
+    parser.add_argument('--diarize', nargs='?', const='deepgram_whisper', type=str, help="Diarize the transcript. Defaults to Deepgram for diarization model unless 'pyannote' is passed as a value.")
     parser.add_argument('--event_name', type=str, required=False)
     parser.add_argument('--reset_pipeline', help="Re-pull pyannote's speaker diarization pipeline.")
     parser.add_argument('--debug', action="store_true", help="Enable debug mode.")
